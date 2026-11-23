@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from zitto import audio, remover, source
-from zitto.models import BAND, LEAD, VOICE
+from zitto.models import FULL, LEAD
 from zitto.targets import UnknownTarget, plan, resolve
 
 
@@ -47,7 +47,7 @@ def test_resolve_rejects(names):
 
 def test_plan_runs_each_model_once():
     steps = plan(resolve(["voice", "drums", "bass"]))
-    assert [(model, keys(group)) for model, group in steps] == [(VOICE, ["voice"]), (BAND, ["drums", "bass"])]
+    assert [(model, keys(group)) for model, group in steps] == [(FULL, ["voice", "drums", "bass"])]
 
 
 def test_subtract_leaves_the_rest_untouched(tmp_path):
@@ -66,7 +66,7 @@ def test_different_models_run_in_cascade(tmp_path):
     mix = np.full((100, 2), 0.4, dtype=np.float32)
     engine = FakeEngine({"lead": lambda m: m * 0.5, "drums": lambda m: m * 0.5})
     rest = remover.subtract(mix, resolve(["lead-voice", "drums"]), engine, tmp_path, lambda s: None)
-    assert [c[0] for c in engine.calls] == [LEAD, BAND]
+    assert [c[0] for c in engine.calls] == [LEAD, FULL]
     np.testing.assert_allclose(engine.calls[1][2], 0.2, rtol=1e-5)
     np.testing.assert_allclose(rest, 0.1, rtol=1e-5)
 

@@ -20,6 +20,7 @@ def no_plugins(monkeypatch):
     monkeypatch.setattr(plugins, "links", lambda: ())
     monkeypatch.setattr(plugins, "model_set", lambda: None)
     monkeypatch.setattr(plugins, "problems", [])
+    monkeypatch.delenv("ZITTO_MODELS", raising=False)
 
 
 class Site(LinkSource):

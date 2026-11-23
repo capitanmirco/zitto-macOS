@@ -217,7 +217,7 @@ def test_controls_act_where_they_are_drawn(window):
 
 def test_songs_can_have_different_parts(window):
     """Those separated with other models."""
-    few = models.parts()
+    few = ("lead", "backing", "drums", "bass", "wind", "other")
     first, second = make_song("a", "Alpha"), make_song("b", "Beta", names=few)
     app = window()
     p = app.player

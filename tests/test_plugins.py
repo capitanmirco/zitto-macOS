@@ -81,14 +81,27 @@ def test_a_ready_song_stays_when_its_plugin_is_gone(monkeypatch, links):
 
 # --- models --------------------------------------------------------------------------
 
-def test_the_default_models_say_their_terms():
-    chosen = models.current()
-    assert chosen is models.DEFAULT
+@pytest.mark.parametrize("chosen", [models.DEFAULT, models.STATED])
+def test_the_models_say_their_terms(chosen):
     for model in (*chosen.main, chosen.lead, chosen.wind):
         assert model.terms and model.page.startswith("https://")
 
 
-def test_only_the_parts_the_models_can_find_are_offered():
+def test_the_default_models_find_every_part():
+    assert models.current() is models.DEFAULT and models.parts() == models.NAMES
+    assert targets.available() == targets.TARGETS
+
+
+def test_models_with_stated_terms_can_be_asked_for(monkeypatch):
+    monkeypatch.setattr(plugins, "model_set", lambda: models.DEFAULT)
+    monkeypatch.setenv("ZITTO_MODELS", "Stated")  # wins over a plugin too
+    assert models.current() is models.STATED
+    chosen = (*models.STATED.main, models.STATED.lead, models.STATED.wind)
+    assert not any(m.terms.startswith(("unknown", "not stated")) for m in chosen)
+
+
+def test_only_the_parts_the_models_can_find_are_offered(monkeypatch):
+    monkeypatch.setenv("ZITTO_MODELS", "stated")
     assert models.parts() == ("lead", "backing", "drums", "bass", "wind", "other")
     assert [t.key for t in targets.available()] == ["voice", "lead-voice", "drums", "bass", "wind", "other"]
     with pytest.raises(targets.UnknownTarget, match="Choose from: voice"):

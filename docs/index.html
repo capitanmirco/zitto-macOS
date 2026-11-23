@@ -11,7 +11,7 @@
   color-scheme: dark;
   --bg: #14171c; --panel: #1b1f26; --raised: #262c36; --edge: #2f3641;
   --text: #e6e9ee; --dim: #a3abb8; --accent: #f5c451;
-  --lead: #ff7a90; --backing: #ff9ecb; --drums: #ffb454; --bass: #8bd450; --wind: #5eead4; --other: #9fb0c3;
+  --lead: #ff7a90; --backing: #ff9ecb; --drums: #ffb454; --bass: #8bd450; --guitar: #4cc9f0; --piano: #b794f6; --wind: #5eead4; --other: #9fb0c3;
   --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --mono: Consolas, "Cascadia Mono", ui-monospace, Menlo, monospace;
@@ -71,7 +71,7 @@ pre { background: var(--panel); border: 1px solid var(--edge); margin: 0; paddin
       <p class="lede">Separates a song into its parts, plays it with each part switched on and off live, and saves the mix you hear. <span class="word">In Italian, <em>zitto</em> means hush.</span></p>
     </div>
     <figure>
-      <img src="images/player.png" width="1400" height="751" alt="The window of zitto: six songs on the left, one of them being separated; on the right the waveforms of lead voice, backing voices, drums, bass, wind and other, with the lead voice muted and a loop selected.">
+      <img src="images/player.png" width="1400" height="831" alt="The window of zitto: six songs on the left, one of them being separated; on the right the waveforms of lead voice, backing voices, drums, bass, guitar, piano, wind and other, with the lead voice muted and a loop selected.">
       <figcaption>The lead voice is muted, a loop runs from 1:14 to 1:51, and another song is being separated in the background. Songs and sound in these pictures are made up.</figcaption>
     </figure>
   </header>
@@ -83,6 +83,8 @@ pre { background: var(--panel); border: 1px solid var(--edge); margin: 0; paddin
       <li style="--c: var(--backing)"><span class="name">Backing voices</span><span class="m" aria-hidden="true">M</span><p>Kept apart from the lead, so the choir can stay.</p></li>
       <li style="--c: var(--drums)"><span class="name">Drums</span><span class="m" aria-hidden="true">M</span><p>Soloed with the bass, to hear how they lock together.</p></li>
       <li style="--c: var(--bass)"><span class="name">Bass</span><span class="m" aria-hidden="true">M</span><p>Each part has its own volume.</p></li>
+      <li style="--c: var(--guitar)"><span class="name">Guitar</span><span class="m" aria-hidden="true">M</span><p>Muted, to play it yourself. All the guitars are one part.</p></li>
+      <li style="--c: var(--piano)"><span class="name">Piano</span><span class="m" aria-hidden="true">M</span><p>Soloed, to work out the chords.</p></li>
       <li style="--c: var(--wind)"><span class="name">Wind</span><span class="m" aria-hidden="true">M</span><p>Sax, flute and brass.</p></li>
       <li style="--c: var(--other)"><span class="name">Other</span><span class="m" aria-hidden="true">M</span><p>Everything else. All the parts together are the original.</p></li>
     </ul>
@@ -90,7 +92,7 @@ pre { background: var(--panel); border: 1px solid var(--edge); margin: 0; paddin
 
   <section class="two">
     <figure>
-      <img src="images/loop.png" width="1400" height="751" alt="Drums and bass soloed, with the waveform zoomed on a loop of nine seconds.">
+      <img src="images/loop.png" width="1400" height="831" alt="Drums and bass soloed, with the waveform zoomed on a loop of nine seconds.">
       <figcaption>Drums and bass alone, zoomed on a loop of 9.2 seconds.</figcaption>
     </figure>
     <div>
@@ -126,13 +128,13 @@ pre { background: var(--panel); border: 1px solid var(--edge); margin: 0; paddin
       <table>
         <thead><tr><th>Model</th><th>Finds</th><th>Size</th><th>Terms</th></tr></thead>
         <tbody>
-          <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR-MDX-NET Main</a></td><td>voice</td><td class="size">67 MB</td><td>MIT, with credit to UVR</td></tr>
-          <tr><td><a href="https://zenodo.org/records/5069601">Open-Unmix UMX-L</a></td><td>drums, bass</td><td class="size">452 MB</td><td>CC BY-NC-SA 4.0</td></tr>
-          <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR 6_HP-Karaoke</a></td><td>lead voice</td><td class="size">127 MB</td><td>MIT, with credit to UVR</td></tr>
+          <tr><td><a href="https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed">BS-Roformer-SW</a></td><td>voice, drums, bass, guitar, piano</td><td class="size">699 MB</td><td>unknown</td></tr>
+          <tr><td><a href="https://huggingface.co/becruily/mel-band-roformer-karaoke">Mel-Roformer Karaoke (becruily)</a></td><td>lead and backing voices</td><td class="size">1719 MB</td><td>not stated</td></tr>
           <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR 17_HP-Wind_Inst</a></td><td>wind</td><td class="size">224 MB</td><td>MIT, with credit to UVR</td></tr>
         </tbody>
       </table>
     </div>
+    <p>The author of BS-Roformer-SW is unknown, and that of the karaoke model does not say how it can be used. zitto can use only models with stated terms instead, with lower quality and without guitar and piano: the README explains how.</p>
     <p>The separation is an estimate. Traces of a part can remain in the others.</p>
   </section>
 

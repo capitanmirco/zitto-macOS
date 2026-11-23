@@ -10,7 +10,7 @@ import pytest
 
 from zitto import audio, library, models, remover, settings, source, worker
 from zitto.mixer import FADE, Mixer, mixdown
-from zitto.models import BAND, LEAD, VOICE, WIND
+from zitto.models import BAND, FULL, LEAD, STATED_LEAD, VOICE, WIND
 from zitto.targets import resolve
 from test_zitto import FakeEngine
 from test_player import render
@@ -18,7 +18,7 @@ from test_player import render
 LINK = "https://songs.example/alpha"
 OTHER = "https://songs.example/beta"
 LIST = "https://songs.example/list/one"
-SHARES = {"voice": 0.4, "drums": 0.2, "bass": 0.1, "lead": 0.75, "wind": 0.5}
+SHARES = {"voice": 0.4, "drums": 0.2, "bass": 0.1, "guitar": 0.05, "piano": 0.05, "lead": 0.75, "wind": 0.5}
 
 pytestmark = pytest.mark.usefixtures("links")
 
@@ -165,7 +165,18 @@ def test_voices_come_from_the_voice_and_wind_from_what_is_left(tmp_path):
     mix = np.full((100, 2), 0.4, np.float32)
     fake = engine()
     parts = worker.split(mix, fake, tmp_path, lambda s: None)
-    assert [c[0] for c in fake.calls] == [VOICE, BAND, LEAD, WIND]
+    assert [c[0] for c in fake.calls] == [FULL, LEAD, WIND] and tuple(parts) == models.NAMES
+    np.testing.assert_allclose(fake.calls[1][2], mix * 0.4, rtol=1e-5)
+    np.testing.assert_allclose(fake.calls[2][2], mix * 0.2, rtol=1e-5)
+    np.testing.assert_allclose(sum(parts.values()), mix, rtol=1e-5)
+
+
+def test_several_models_work_each_on_what_the_others_left(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZITTO_MODELS", "stated")
+    mix = np.full((100, 2), 0.4, np.float32)
+    fake = engine()
+    parts = worker.split(mix, fake, tmp_path, lambda s: None)
+    assert [c[0] for c in fake.calls] == [VOICE, BAND, STATED_LEAD, WIND]
     np.testing.assert_allclose(fake.calls[1][2], mix * 0.6, rtol=1e-5)  # without the voice
     np.testing.assert_allclose(fake.calls[2][2], mix * 0.4, rtol=1e-5)
     np.testing.assert_allclose(fake.calls[3][2], mix * 0.6 * 0.7, rtol=1e-5)
@@ -174,8 +185,10 @@ def test_voices_come_from_the_voice_and_wind_from_what_is_left(tmp_path):
 
 def test_models_do_not_run_on_silence(tmp_path):
     fake = FakeEngine({n: (lambda m: m * 0) for n in SHARES} | {"drums": lambda m: m})
-    parts = worker.split(np.full((100, 2), 0.4, np.float32), fake, tmp_path, lambda s: None)
-    assert [c[0] for c in fake.calls] == [VOICE, BAND] and not parts["lead"].any()
+    said = []
+    parts = worker.split(np.full((100, 2), 0.4, np.float32), fake, tmp_path, said.append)
+    assert [c[0] for c in fake.calls] == [FULL] and not parts["lead"].any()
+    assert said == ["Separating the instruments"]
 
 
 def test_loud_parts_do_not_clip(song_file, tmp_path):

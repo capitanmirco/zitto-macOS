@@ -29,11 +29,11 @@ SILENT = 1e-4
 def split(mix: np.ndarray, engine, workdir: Path, status: Status) -> dict[str, np.ndarray]:
     """All the parts of `mix`. They add up to it exactly."""
     def stems(audio_in, model, parts, text):
+        if np.abs(audio_in).max() < SILENT:  # nothing to look for, e.g. no voice at all
+            return {part: np.zeros_like(audio_in) for part in parts}
         if not engine.is_downloaded(model):
             status(f"Downloading a model (first time only): {model.name}")
         status(text)
-        if np.abs(audio_in).max() < SILENT:  # nothing to look for, e.g. no voice at all
-            return {part: np.zeros_like(audio_in) for part in parts}
         return engine.stems(audio_in, model, parts, workdir)
 
     models = current()
