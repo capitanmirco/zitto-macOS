@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Separates a song into its parts and plays it with each part on or off.">
+<title>zitto</title>
+<style>
+/* Layout: one column led by the app's own window; parts shown as the rows of its player. One dark look, the app's. */
+:root {
+  color-scheme: dark;
+  --bg: #14171c; --panel: #1b1f26; --raised: #262c36; --edge: #2f3641;
+  --text: #e6e9ee; --dim: #a3abb8; --accent: #f5c451;
+  --lead: #ff7a90; --backing: #ff9ecb; --drums: #ffb454; --bass: #8bd450; --wind: #5eead4; --other: #9fb0c3;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: Consolas, "Cascadia Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); }
+.page { max-width: 1120px; margin-inline: auto; padding-block: 56px 72px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 64px; }
+.page > * { min-width: 0; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(56px, 11vw, 104px); font-weight: 700; letter-spacing: -0.045em; line-height: 0.95; }
+h2 { font-size: 27px; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; max-width: 64ch; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+code, pre { font-family: var(--mono); font-size: 15px; }
+figure { margin: 0; display: grid; gap: 10px; }
+img { display: block; width: 100%; height: auto; border: 1px solid var(--edge); }
+figcaption { color: var(--dim); font-size: 15px; max-width: 75ch; }
+header { display: grid; gap: 24px; }
+.intro { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 56px; align-items: end; }
+.lede { font-size: 21px; line-height: 1.5; }
+.word { color: var(--dim); font-size: 16px; }
+section { display: grid; gap: 20px; }
+.parts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--edge); }
+.parts li { display: grid; grid-template-columns: 170px 34px minmax(0, 1fr); gap: 0 14px; align-items: center;
+  padding-block: 8px; border-bottom: 1px solid var(--edge); }
+.name { background: var(--c); color: var(--bg); font-weight: 600; font-size: 15px; padding: 9px 12px; }
+.m { background: var(--raised); color: var(--dim); font: 600 13px/1 var(--sans); text-align: center; padding: 12px 0; }
+.off .name { background: var(--raised); color: var(--dim); }
+.off .m { background: var(--lead); color: var(--bg); }
+.off p { color: var(--dim); }
+.two { grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 32px 40px; align-items: start; }
+.two > div { display: grid; gap: 14px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 16px; }
+th, td { text-align: left; padding: 10px 20px 10px 0; border-bottom: 1px solid var(--edge); vertical-align: top; }
+th { color: var(--dim); font-weight: 400; font-size: 15px; }
+td.size { font-variant-numeric: tabular-nums; white-space: nowrap; }
+pre { background: var(--panel); border: 1px solid var(--edge); margin: 0; padding: 14px 16px; overflow-x: auto; }
+.terms { border-top: 3px solid var(--accent); padding-top: 28px; }
+@media (max-width: 760px) {
+  .page { padding-block: 32px 48px; gap: 48px; }
+  .intro, .two { grid-template-columns: minmax(0, 1fr); }
+  .parts li { grid-template-columns: minmax(0, 1fr) 34px; }
+  .parts p { grid-column: 1 / -1; padding-block: 8px 4px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="intro">
+      <h1>zitto</h1>
+      <p class="lede">Separates a song into its parts, plays it with each part switched on and off live, and saves the mix you hear. <span class="word">In Italian, <em>zitto</em> means hush.</span></p>
+    </div>
+    <figure>
+      <img src="images/player.png" width="1400" height="751" alt="The window of zitto: six songs on the left, one of them being separated; on the right the waveforms of lead voice, backing voices, drums, bass, wind and other, with the lead voice muted and a loop selected.">
+      <figcaption>The lead voice is muted, a loop runs from 1:14 to 1:51, and another song is being separated in the background. Songs and sound in these pictures are made up.</figcaption>
+    </figure>
+  </header>
+
+  <section>
+    <h2>The parts of a song</h2>
+    <ul class="parts">
+      <li class="off" style="--c: var(--lead)"><span class="name">Lead voice</span><span class="m" aria-hidden="true">M</span><p>Muted, to sing it yourself.</p></li>
+      <li style="--c: var(--backing)"><span class="name">Backing voices</span><span class="m" aria-hidden="true">M</span><p>Kept apart from the lead, so the choir can stay.</p></li>
+      <li style="--c: var(--drums)"><span class="name">Drums</span><span class="m" aria-hidden="true">M</span><p>Soloed with the bass, to hear how they lock together.</p></li>
+      <li style="--c: var(--bass)"><span class="name">Bass</span><span class="m" aria-hidden="true">M</span><p>Each part has its own volume.</p></li>
+      <li style="--c: var(--wind)"><span class="name">Wind</span><span class="m" aria-hidden="true">M</span><p>Sax, flute and brass.</p></li>
+      <li style="--c: var(--other)"><span class="name">Other</span><span class="m" aria-hidden="true">M</span><p>Everything else. All the parts together are the original.</p></li>
+    </ul>
+  </section>
+
+  <section class="two">
+    <figure>
+      <img src="images/loop.png" width="1400" height="751" alt="Drums and bass soloed, with the waveform zoomed on a loop of nine seconds.">
+      <figcaption>Drums and bass alone, zoomed on a loop of 9.2 seconds.</figcaption>
+    </figure>
+    <div>
+      <h2>Made for practising</h2>
+      <p>Drag on the waveform to repeat a passage. Zoom with the wheel, mute parts with the number keys, and save the result as MP3, FLAC or WAV.</p>
+      <p>Close it whenever you like. The next time the song is as you left it.</p>
+    </div>
+  </section>
+
+  <section class="two">
+    <div>
+      <h2>Hands on the instrument</h2>
+      <p>Play, Pause, Stop and Rewind answer to a MIDI pedal or controller. Transport messages work at once. For any other button press Learn, then the button.</p>
+    </div>
+    <figure>
+      <img src="images/midi.png" width="426" height="257" alt="The MIDI controls: Play is assigned to controller 64 on channel 1.">
+      <figcaption>Play on a sustain pedal (CC 64).</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <p>Windows, with Python 3.12 in <code>C:\Python312</code> and ffmpeg on the PATH. An NVIDIA card makes it much faster. Get the source from <a href="https://github.com/danmigdev/zitto">GitHub</a>, then run:</p>
+    <pre>.\setup.bat
+.\window.bat</pre>
+    <p>Songs stay on your computer. The internet is only needed to install, and to download the models the first time.</p>
+  </section>
+
+  <section>
+    <h2>The models</h2>
+    <p>zitto does not include them. Each is downloaded from its own source the first time it is needed.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Model</th><th>Finds</th><th>Size</th><th>Terms</th></tr></thead>
+        <tbody>
+          <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR-MDX-NET Main</a></td><td>voice</td><td class="size">67 MB</td><td>MIT, with credit to UVR</td></tr>
+          <tr><td><a href="https://zenodo.org/records/5069601">Open-Unmix UMX-L</a></td><td>drums, bass</td><td class="size">452 MB</td><td>CC BY-NC-SA 4.0</td></tr>
+          <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR 6_HP-Karaoke</a></td><td>lead voice</td><td class="size">127 MB</td><td>MIT, with credit to UVR</td></tr>
+          <tr><td><a href="https://github.com/Anjok07/ultimatevocalremovergui">UVR 17_HP-Wind_Inst</a></td><td>wind</td><td class="size">224 MB</td><td>MIT, with credit to UVR</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The separation is an estimate. Traces of a part can remain in the others.</p>
+  </section>
+
+  <section class="terms">
+    <h2>Terms</h2>
+    <p>Free for any non-commercial use, under the <a href="https://polyformproject.org/licenses/noncommercial/1.0.0">PolyForm Noncommercial License 1.0.0</a>. Selling it is not allowed.</p>
+    <p>Use it with recordings that you made, or that you have the right to use in this way. Separating a song gives no right on it.</p>
+  </section>
+</div>
+</body>
+</html>

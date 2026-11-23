@@ -1,0 +1,25 @@
+# Only provides the zitto.exe command. Dependencies are in requirements.txt (see setup.bat).
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zitto"
+description = "Separate a song into its parts, play it with each part on or off, save the mix"
+readme = "README.md"
+license = "PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE.md", "NOTICE.md"]
+requires-python = ">=3.11"
+dynamic = ["version"]
+
+[project.scripts]
+zitto = "zitto.__main__:main"
+
+[tool.setuptools]
+packages = ["zitto"]
+
+[tool.setuptools.dynamic]
+version = { attr = "zitto.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

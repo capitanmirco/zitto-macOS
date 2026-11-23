@@ -1,0 +1,118 @@
+# zitto
+
+Separates songs into their parts, plays them with each part switched on and off live, and
+saves the song with the parts you want. Everything runs on your Windows computer, on the
+NVIDIA GPU when there is one. *Zitto* is Italian for "hush".
+
+![The window: songs on the left, the parts of the open one on the right](docs/images/player.png)
+
+Use it with recordings that you made, or that you have the right to use in this way. What you
+do with the result is your responsibility: see [Terms](#terms).
+
+## Install
+
+Needs Python 3.12 in `C:\Python312` and ffmpeg on the PATH. Then run once:
+
+    .\setup.bat
+
+## Use
+
+Double-click `window.bat`.
+
+1. **Files...** adds songs to the list on the left. They are separated one after the other, in
+   the background.
+2. **Double-click** a song that is ready to open it. One that is still waiting goes to the
+   front of the queue, and opens when it is ready.
+3. **Play** it, switching parts on and off, with a loop if you like.
+4. **Save...** writes the song as you hear it: parts that are on, at their volumes.
+
+Each song is separated only once. Close the window whenever you like: at the next start the
+last song is there as you left it, with its parts, volumes and loop, and what was still
+waiting goes on.
+
+The parts: lead voice, backing voices, drums, bass, wind, other. All of them together are the
+original.
+
+### Player
+
+![Drums and bass alone, zoomed on a loop of nine seconds](docs/images/loop.png)
+
+| To | Do |
+| --- | --- |
+| mute a part | M, or click its name, or its number on the keyboard |
+| hear only some | S (solo); a muted part stays silent also when soloed |
+| set its volume | drag the line under its name |
+| select a loop | drag on the waveform, then drag its edges to adjust |
+| move | click on the waveform |
+| zoom, scroll | wheel, Shift+wheel |
+| play/pause, rewind, loop on/off, clear loop, save | Space, Home, L, Esc, Ctrl+S |
+
+Stop and Rewind go back to the start of the loop, or of the song when there is no loop.
+
+### MIDI
+
+Choose the device at the bottom. Play, Pause, Stop and Rewind respond to:
+
+- standard transport messages, with no setup: MMC, and Start/Continue/Stop
+- any note, control change or program change: press **Assign...**, **Learn**, then the button
+
+Pause pressed again resumes. Windows usually lets one program at a time use a MIDI input:
+close others that hold the device.
+
+### List
+
+- Songs are listed as "Artist - Title", from the tags of the file, or with the name of the
+  file. Right-click, Rename, to change it
+- Search (Ctrl+F) looks for all the words, anywhere in the name, ignoring accents and
+  capitals. Enter opens the first song found, Esc shows everything again
+- A song that failed is in red: select it to read why, right-click to try again
+- Delete removes songs from the library, never your own files or what you saved
+
+## Command line
+
+For removing something without opening the window. The result goes to `output\`:
+
+    .\zitto.exe song.mp3                     remove the voice
+    .\zitto.exe song.mp3 -r drums bass       remove drums and bass
+    .\zitto.exe song.mp3 -o result.flac
+    .\zitto.exe song.mp3 --player            open the window with this song
+
+Names (Italian ones too): `voice`, `lead-voice`, `drums`, `bass`, `wind`, `other`.
+
+## How it works
+
+Four models estimate the parts; what none of them recognises stays in "other". They are not
+part of zitto: each is downloaded to `models\` the first time it is needed.
+
+| Model | Used for | Size | Terms |
+| --- | --- | --- | --- |
+| [UVR-MDX-NET Main](https://github.com/Anjok07/ultimatevocalremovergui) | voice | 0.1 GB | MIT, with credit to UVR |
+| [Open-Unmix UMX-L](https://zenodo.org/records/5069601) | drums, bass | 0.5 GB | CC BY-NC-SA 4.0 |
+| [UVR 6_HP-Karaoke](https://github.com/Anjok07/ultimatevocalremovergui) | lead and backing voices | 0.1 GB | MIT, with credit to UVR |
+| [UVR 17_HP-Wind_Inst](https://github.com/Anjok07/ultimatevocalremovergui) | wind | 0.2 GB | MIT, with credit to UVR |
+
+The separation is an estimate: traces of a part can remain in the others, and instruments
+that sound alike cannot be told apart.
+
+Songs are kept in `library\`, up to 17 MB per minute. To keep them elsewhere, set the
+environment variable `ZITTO_LIBRARY` to a folder.
+
+Plugins can add places to open songs from, or other models: see [docs/PLUGINS.md](docs/PLUGINS.md).
+
+## Tests
+
+    .venv\Scripts\python.exe -m pip install pytest
+    .venv\Scripts\python.exe -m pytest
+
+## Terms
+
+zitto is under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): you can use, change and
+share it for any non-commercial purpose. Selling it, or using it commercially, is not allowed.
+The source is available, but this is not an "open source" licence as the OSI defines it, since
+those cannot forbid selling.
+
+The models and the libraries that setup.bat installs have terms of their own, listed in
+[NOTICE.md](NOTICE.md). Two of them are for non-commercial use only.
+
+Separating a song does not give any right on it. Copying, publishing or performing a recording
+made by others, or part of it, usually needs the permission of who holds its rights.

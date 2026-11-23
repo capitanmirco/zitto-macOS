@@ -1,0 +1,14 @@
+/.venv/
+/models/
+/output/
+/library/
+/settings.json
+/zitto.exe
+/build/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+
+# Never published
+/private/
+/docs/plans/
