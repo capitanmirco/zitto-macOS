@@ -1,0 +1,13 @@
+# The worker on macOS: what setup-worker.sh installs. Torch from PyPI already runs on the GPU of
+# Apple silicon (MPS). The window is the native app in macos/, so tkinter, sounddevice and
+# python-rtmidi are not needed here.
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0
+audio-separator[cpu]==0.48.0
+audioread>=3.0
+librosa==1.0.1
+numpy==2.5.5
+openunmix==1.3.0
+soundfile
+tinytag==2.3.2

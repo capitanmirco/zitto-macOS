@@ -48,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(errors="replace")  # titles may not fit the console code page
     args = parser.parse_args(argv)
     if args.player:
+        if sys.platform == "darwin":  # the window is the native app, in macos/
+            import subprocess
+
+            return subprocess.run(["open", "-a", "zitto", args.source]).returncode
         from .gui import main as window
         return window(args.source)
     try:
