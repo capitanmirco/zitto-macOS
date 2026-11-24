@@ -15,7 +15,7 @@ jobs:
         shell: bash -eo pipefail {0}
         working-directory: macos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Versions
         run: swift --version && sw_vers
       - name: Build
@@ -24,7 +24,7 @@ jobs:
         run: swift test 2>&1 | tee test.log
       - name: App bundle
         run: scripts/build-app.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: zitto-app
           path: macos/build/zitto.app
