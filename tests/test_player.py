@@ -8,8 +8,9 @@ import numpy as np
 import pytest
 
 from zitto import midi
+from zitto.library import StemSet
 from zitto.mixer import FADE, MIN_LOOP, PAUSED, PLAYING, STOPPED, Mixer, mixdown
-from zitto.player import mix_name
+from zitto.player import all_peaks, controls, heard, mix_name
 
 N = 40000
 
@@ -402,3 +403,49 @@ ALL = ("lead", "backing", "drums", "bass", "guitar", "piano", "wind", "other")
 ])
 def test_mix_name(off, name):
     assert mix_name({n: n not in off for n in ALL}) == name
+
+
+@pytest.mark.parametrize("off, name", [
+    (("kick", "snare", "toms", "cymbals"), " (no drums)"),
+    (("kick",), " (no kick)"),
+    (("lead", "backing", "kick", "snare", "toms", "cymbals"), " (no voice, drums)"),
+    (("lead", "backing", "guitar", "other"), " (only drums, bass)"),  # two parts against four
+])
+def test_all_the_pieces_are_the_drums(off, name):
+    stems = ("lead", "backing", "kick", "snare", "toms", "cymbals", "bass", "guitar", "other")
+    assert mix_name({s: s not in off for s in stems}) == name
+
+
+# --- parts and pieces ------------------------------------------------------------------
+
+PIECED = ("lead", "kick", "snare", "toms", "cymbals", "bass")
+
+
+def test_the_pieces_follow_their_part():
+    assert controls(PIECED) == [("lead", None), ("drums", None), ("kick", 1), ("snare", 1), ("toms", 1),
+                                ("cymbals", 1), ("bass", None)]
+    assert controls(("lead", "drums", "bass")) == [("lead", None), ("drums", None), ("bass", None)]
+
+
+def sounding(off=(), solo=()):
+    names, wholes = zip(*controls(PIECED))
+    result = heard([n not in off for n in names], [n in solo for n in names], list(wholes))
+    return {n for n, r in zip(names, result) if r}
+
+
+def test_muting_and_soloing_parts_and_pieces():
+    everything = {"lead", "drums", "kick", "snare", "toms", "cymbals", "bass"}
+    assert sounding() == everything
+    assert sounding(off=("kick",)) == everything - {"kick"}
+    assert sounding(off=("drums",)) == {"lead", "bass"}
+    assert sounding(off=("kick", "snare", "toms", "cymbals")) == {"lead", "bass"}  # the part too is silent
+    assert sounding(solo=("drums",)) == everything - {"lead", "bass"}
+    assert sounding(solo=("kick", "bass")) == {"drums", "kick", "bass"}
+    assert sounding(solo=("drums", "kick")) == {"drums", "kick"}  # the piece wins
+    assert sounding(solo=("kick",), off=("drums",)) == set()
+
+
+def test_the_drums_are_drawn_from_their_pieces():
+    data = [np.full((640, 2), v, np.int16) for v in (100, 1000, 20000, 20000, 5, 7)]
+    found = all_peaks(StemSet(PIECED, data, 1.0))
+    assert found["drums"].max() == 41005 and found["kick"].max() == 1000 and set(found) == {*PIECED, "drums"}

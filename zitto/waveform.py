@@ -107,6 +107,14 @@ class Waveform(tk.Frame):
         self._top = max(1, max(int(p.max()) for p in values))
         self.show_all()
 
+    def set_lanes(self, values: list[np.ndarray], colors: list[str]) -> None:
+        """Other lanes for the same song: the view and the loop stay."""
+        self._peaks, self._colors = values, colors
+        self._audible = [True] * len(values)
+        self._top = max(self._top, max(int(p.max()) for p in values))
+        self._new_view = True
+        self._request()
+
     def set_audible(self, audible: list[bool]) -> None:
         changed = [i for i, (a, b) in enumerate(zip(audible, self._audible)) if a != b]
         self._audible = list(audible)

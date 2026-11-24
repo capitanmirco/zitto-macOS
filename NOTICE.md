@@ -17,6 +17,8 @@ sources to the computer of whoever installs zitto, each under its own terms.
   from
 - **Mel-Roformer Karaoke**, by becruily. [Its page](https://huggingface.co/becruily/mel-band-roformer-karaoke)
   states no licence
+- **MDX23C DrumSep**, by aufr33 and jarredou. Their page is no longer there. According to
+  [a package that uses it](https://pypi.org/project/mdxnet-infer/), no licence came with it
 - **Ultimate Vocal Remover** (17_HP-Wind_Inst; with `stated` also UVR-MDX-NET Main and
   6_HP-Karaoke), by Anjok07 and aufr33 and the other developers of UVR. Their README asks: "For all third-party application
   developers who wish to use our models, please honor the MIT license by providing credit to

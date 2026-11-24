@@ -126,6 +126,7 @@ def my_models():
     return ModelSet(main=(FULL,), lead=LEAD, wind=WIND)
 ```
 
+- `drums`, if it is given, finds `kick`, `snare` and `toms` inside the drums. The cymbals are the rest
 - `main` runs in order on the song, each model on what the others left. Together they must find
   at least `voice`
 - `lead` finds the lead voice inside the voice, `wind` the wind instruments in what is left

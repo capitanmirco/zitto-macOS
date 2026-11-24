@@ -10,7 +10,7 @@ import pytest
 
 from zitto import audio, library, models, remover, settings, source, worker
 from zitto.mixer import FADE, Mixer, mixdown
-from zitto.models import BAND, FULL, LEAD, STATED_LEAD, VOICE, WIND
+from zitto.models import BAND, DRUMS, FULL, LEAD, STATED_LEAD, VOICE, WIND
 from zitto.targets import resolve
 from test_zitto import FakeEngine
 from test_player import render
@@ -18,7 +18,8 @@ from test_player import render
 LINK = "https://songs.example/alpha"
 OTHER = "https://songs.example/beta"
 LIST = "https://songs.example/list/one"
-SHARES = {"voice": 0.4, "drums": 0.2, "bass": 0.1, "guitar": 0.05, "piano": 0.05, "lead": 0.75, "wind": 0.5}
+SHARES = {"voice": 0.4, "drums": 0.2, "bass": 0.1, "guitar": 0.05, "piano": 0.05, "lead": 0.75, "wind": 0.5,
+          "kick": 0.4, "snare": 0.3, "toms": 0.1}
 
 pytestmark = pytest.mark.usefixtures("links")
 
@@ -152,7 +153,7 @@ def test_the_parts_add_up_to_the_original(song_file, tmp_path):
     assert library.get(song.key).ready and library.waiting() == []
 
     stems = library.load_stems(song.key)
-    assert stems.names == models.parts()
+    assert stems.names == models.stems()
     mixer = Mixer(stems.data, stems.gain)
     mixer.play()
     np.testing.assert_allclose(render(mixer, 5000)[FADE:], mix[FADE:], atol=4e-4)
@@ -165,9 +166,11 @@ def test_voices_come_from_the_voice_and_wind_from_what_is_left(tmp_path):
     mix = np.full((100, 2), 0.4, np.float32)
     fake = engine()
     parts = worker.split(mix, fake, tmp_path, lambda s: None)
-    assert [c[0] for c in fake.calls] == [FULL, LEAD, WIND] and tuple(parts) == models.NAMES
+    assert [c[0] for c in fake.calls] == [FULL, LEAD, WIND, DRUMS] and tuple(parts) == models.stems()
     np.testing.assert_allclose(fake.calls[1][2], mix * 0.4, rtol=1e-5)
     np.testing.assert_allclose(fake.calls[2][2], mix * 0.2, rtol=1e-5)
+    np.testing.assert_allclose(fake.calls[3][2], mix * 0.2, rtol=1e-5)  # the drums
+    np.testing.assert_allclose(parts["cymbals"], mix * 0.2 * 0.2, rtol=1e-5)  # what the other pieces leave
     np.testing.assert_allclose(sum(parts.values()), mix, rtol=1e-5)
 
 
@@ -176,7 +179,7 @@ def test_several_models_work_each_on_what_the_others_left(tmp_path, monkeypatch)
     mix = np.full((100, 2), 0.4, np.float32)
     fake = engine()
     parts = worker.split(mix, fake, tmp_path, lambda s: None)
-    assert [c[0] for c in fake.calls] == [VOICE, BAND, STATED_LEAD, WIND]
+    assert [c[0] for c in fake.calls] == [VOICE, BAND, STATED_LEAD, WIND] and "drums" in parts
     np.testing.assert_allclose(fake.calls[1][2], mix * 0.6, rtol=1e-5)  # without the voice
     np.testing.assert_allclose(fake.calls[2][2], mix * 0.4, rtol=1e-5)
     np.testing.assert_allclose(fake.calls[3][2], mix * 0.6 * 0.7, rtol=1e-5)
@@ -187,8 +190,8 @@ def test_models_do_not_run_on_silence(tmp_path):
     fake = FakeEngine({n: (lambda m: m * 0) for n in SHARES} | {"drums": lambda m: m})
     said = []
     parts = worker.split(np.full((100, 2), 0.4, np.float32), fake, tmp_path, said.append)
-    assert [c[0] for c in fake.calls] == [FULL] and not parts["lead"].any()
-    assert said == ["Separating the instruments"]
+    assert [c[0] for c in fake.calls] == [FULL, DRUMS] and not parts["lead"].any()
+    assert said == ["Separating the instruments", "Separating the drums"]
 
 
 def test_loud_parts_do_not_clip(song_file, tmp_path):

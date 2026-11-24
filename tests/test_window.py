@@ -228,7 +228,7 @@ def test_songs_can_have_different_parts(window):
     app.open(second)
     until(app, lambda: p.key == second)
     assert p.names == few and p.on == [True] * len(few) and len(p.parts._rows) == len(few)
-    p.toggle_part(7)  # a key with no part
+    p.toggle_main(7)  # a key with no part
     p.toggle_part(1)
     assert p.audible() == [n != "backing" for n in few]
     app.open(first)
@@ -236,6 +236,61 @@ def test_songs_can_have_different_parts(window):
     assert p.on == [True] * 7 + [False]
     p.leave()
     assert list(library.load_state(second)["on"]) == list(few)
+
+
+def test_the_drums_open_into_their_pieces(window):
+    key = make_song("a", "Alpha", names=models.stems())
+    other = make_song("b", "Beta")  # separated before, without pieces
+    app = window()
+    p = app.player
+    app.open(key)
+    until(app, lambda: p.key == key)
+    assert len(p.parts._rows) == 8 and len(p.names) == 12 and "arrow" in p.parts._rows[2]
+    p.toggle_main(2)  # the key of the drums
+    kick, bass = p.names.index("kick"), p.names.index("bass")
+    level = lambda stem: p.mixer._wanted[models.stems().index(stem)]
+    assert [level(s) for s in ("kick", "snare", "toms", "cymbals", "bass")] == [0, 0, 0, 0, 1]
+    p.toggle_main(2)
+    p.toggle_main(3)  # the next part, not a piece
+    assert not p.on[bass] and all(p.on[kick:kick + 4])
+    p.toggle_main(3)
+
+    p.wave._set_view(N // 4, 100)
+    view = p.wave._first, p.wave._per_pixel
+    p.toggle_pieces("drums")
+    app.root.update()
+    assert len(p.parts._rows) == len(p.wave._peaks) == 12 and (p.wave._first, p.wave._per_pixel) == view
+    p.toggle_part(kick)
+    p.set_volume(p.names.index("drums"), 0.5)
+    p.set_volume(p.names.index("snare"), 0.5)
+    assert level("kick") == 0 and level("snare") == pytest.approx(0.0625) and level("toms") == pytest.approx(0.25)
+    assert p.audible()[p.names.index("drums")]
+
+    app.open(other)
+    until(app, lambda: p.key == other)
+    assert p.names == models.NAMES and len(p.parts._rows) == len(p.wave._peaks) == 8 and p.mixer._wanted == [1.0] * 8
+    app.open(key)
+    until(app, lambda: p.key == key)
+    assert p.opened == {"drums"} and len(p.parts._rows) == 12 and level("kick") == 0
+    p.toggle_pieces("drums")
+    assert len(p.parts._rows) == len(p.wave._peaks) == 8 and level("kick") == 0  # hidden, not switched on again
+
+
+def test_the_arrow_opens_the_drums(window):
+    key = make_song("a", "Alpha", names=models.stems())
+    app = window()
+    app.open(key)
+    until(app, lambda: app.player.key == key)
+    p = app.player
+    p.parts.place_rows([(22 + 60 * i, 60) for i in range(8)])
+    x, y = p.parts.coords(p.parts._rows[2]["arrow"])
+    p.parts._press(type("E", (), {"x": x, "y": y}))
+    assert p.opened == {"drums"} and all(p.on)
+    p.parts.place_rows([(22 + 34 * i, 34) for i in range(12)])  # low rows: M and S side by side
+    for item in ("mute", "solo"):
+        x0, y0, x1, y1 = p.parts.coords(p.parts._rows[4][item])
+        p.parts._press(type("E", (), {"x": (x0 + x1) / 2, "y": (y0 + y1) / 2}))
+    assert not p.on[4] and p.solo[4] and sum(p.solo) == 1
 
 
 @pytest.mark.parametrize("x, y, what", [

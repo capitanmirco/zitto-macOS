@@ -30,18 +30,19 @@ Each song is separated only once. Close the window whenever you like: at the nex
 last song is there as you left it, with its parts, volumes and loop, and what was still
 waiting goes on.
 
-The parts: lead voice, backing voices, drums, bass, guitar, piano, wind, other. All of them
-together are the original.
+The parts: lead voice, backing voices, drums, bass, guitar, piano, wind, other. The drums open
+into kick, snare, toms and cymbals. All of them together are the original.
 
 ### Player
 
-![Drums and bass alone, zoomed on a loop of nine seconds](docs/images/loop.png)
+![The drums opened into their pieces: kick, snare and bass alone, on a loop of nine seconds](docs/images/loop.png)
 
 | To | Do |
 | --- | --- |
 | mute a part | M, or click its name, or its number on the keyboard |
 | hear only some | S (solo); a muted part stays silent also when soloed |
 | set its volume | drag the line under its name |
+| open the drums into their pieces | the arrow beside their name; mute and volume of the drums act on all the pieces |
 | select a loop | drag on the waveform, then drag its edges to adjust |
 | move | click on the waveform |
 | zoom, scroll | wheel, Shift+wheel |
@@ -82,19 +83,21 @@ Names (Italian ones too): `voice`, `lead-voice`, `drums`, `bass`, `guitar`, `pia
 
 ## How it works
 
-Three models estimate the parts; what none of them recognises stays in "other". They are not
+Four models estimate the parts; what none of them recognises stays in "other". They are not
 part of zitto: each is downloaded to `models\` the first time it is needed.
 
 | Model | Used for | Size | Terms |
 | --- | --- | --- | --- |
 | [BS-Roformer-SW](https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed) | voice, drums, bass, guitar, piano | 0.7 GB | **unknown** |
 | [Mel-Roformer Karaoke (becruily)](https://huggingface.co/becruily/mel-band-roformer-karaoke) | lead and backing voices | 1.7 GB | **not stated** |
+| [MDX23C DrumSep (aufr33, jarredou)](https://pypi.org/project/mdxnet-infer/) | kick, snare, toms, cymbals | 0.4 GB | **not stated** |
 | [UVR 17_HP-Wind_Inst](https://github.com/Anjok07/ultimatevocalremovergui) | wind | 0.2 GB | MIT, with credit to UVR |
 
-The first two were chosen for their quality, but how they can be used is not known: the author
-of the first is unknown, the author of the second does not say. Decide for yourself whether
+The first three were chosen for their quality, but how they can be used is not known: the author
+of the first is unknown, those of the others do not say. Decide for yourself whether
 to use them. To have only models whose authors state their terms, set the environment variable
-`ZITTO_MODELS` to `stated`. The quality is lower, and guitar and piano stay in "other":
+`ZITTO_MODELS` to `stated`. The quality is lower, guitar and piano stay in "other", and the drums
+are one part:
 
 | Model | Used for | Size | Terms |
 | --- | --- | --- | --- |
@@ -106,7 +109,7 @@ to use them. To have only models whose authors state their terms, set the enviro
 The separation is an estimate: traces of a part can remain in the others, and instruments
 that sound alike (two guitars, for example) cannot be told apart.
 
-Songs are kept in `library\`, up to 17 MB per minute. To keep them elsewhere, set the
+Songs are kept in `library\`, about 20 MB per minute. To keep them elsewhere, set the
 environment variable `ZITTO_LIBRARY` to a folder.
 
 Plugins can add places to open songs from, or other models: see [docs/PLUGINS.md](docs/PLUGINS.md).
@@ -124,7 +127,7 @@ The source is available, but this is not an "open source" licence as the OSI def
 those cannot forbid selling.
 
 The models and the libraries that setup.bat installs have terms of their own, listed in
-[NOTICE.md](NOTICE.md). Those of two models are not known, and some are for non-commercial
+[NOTICE.md](NOTICE.md). Those of three models are not known, and some are for non-commercial
 use only.
 
 Separating a song does not give any right on it. Copying, publishing or performing a recording

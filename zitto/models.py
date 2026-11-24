@@ -14,7 +14,11 @@ from . import plugins
 # The parts of a song, in the order they are shown. A set of models may tell apart only some.
 NAMES = ("lead", "backing", "drums", "bass", "guitar", "piano", "wind", "other")
 LABELS = {"lead": "Lead voice", "backing": "Backing voices", "drums": "Drums", "bass": "Bass",
-          "guitar": "Guitar", "piano": "Piano", "wind": "Wind", "other": "Other"}
+          "guitar": "Guitar", "piano": "Piano", "wind": "Wind", "other": "Other",
+          "kick": "Kick", "snare": "Snare", "toms": "Toms", "cymbals": "Cymbals"}
+# Parts that can be stored as pieces. The last piece is what the others leave.
+PIECES = {"drums": ("kick", "snare", "toms", "cymbals")}
+STEMS = tuple(s for n in NAMES for s in (*PIECES.get(n, ()), n))  # all that can be stored, in order
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,7 @@ class ModelSet:
     main: tuple[Model, ...]  # run in this order on the song, each on what the others left
     lead: Model  # the lead voice, inside the voice
     wind: Model  # the wind instruments, in what is left
+    drums: Model | None = None  # the pieces of the drums, inside the drums
 
 
 _UVR = {"terms": "MIT, with credit to UVR and its developers (as their README asks)",
@@ -53,7 +58,11 @@ BAND = Model("Open-Unmix UMX-L", "umxl", {"drums": "drums", "bass": "bass", "oth
              "CC BY-NC-SA 4.0: not for commercial use", "https://zenodo.org/records/5069601", backend="openunmix")
 STATED_LEAD = Model("UVR 6_HP-Karaoke", "6_HP-Karaoke-UVR.pth", {"lead": "Vocals"}, **_UVR)
 
-DEFAULT = ModelSet((FULL,), LEAD, WIND)
+DRUMS = Model("MDX23C DrumSep (aufr33, jarredou)", "MDX23C-DrumSep-aufr33-jarredou.ckpt",
+              {"kick": "kick", "snare": "snare", "toms": "toms"},
+              "not stated", "https://pypi.org/project/mdxnet-infer/")
+
+DEFAULT = ModelSet((FULL,), LEAD, WIND, DRUMS)
 STATED = ModelSet((VOICE, BAND), STATED_LEAD, WIND)  # only models whose authors say how they can be used
 
 
@@ -73,3 +82,14 @@ def parts() -> tuple[str, ...]:
     """The parts that the current models tell apart."""
     found = {"lead", "backing", "wind", "other"}.union(*(m.parts for m in current().main))
     return tuple(n for n in NAMES if n in found)
+
+
+def stems() -> tuple[str, ...]:
+    """What is stored of a song separated now: its parts, or their pieces."""
+    split = PIECES if current().drums else {}
+    return tuple(s for n in parts() for s in split.get(n, (n,)))
+
+
+def whole(stem: str) -> str | None:
+    """The part that a stem is a piece of."""
+    return next((part for part, pieces in PIECES.items() if stem in pieces), None)

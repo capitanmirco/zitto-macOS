@@ -14,11 +14,10 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from . import jobs, library, plugins, settings, theme
 from .mixer import PLAYING
 from .models import NAMES
-from .player import PlayerView
+from .player import PlayerView, all_peaks
 from .source import LIST, SONG_IN_LIST, SourceError, is_url, kind, plain
 from .surface import keep_content_on_resize
 from .theme import ACCENT, BAD, BG, BUTTON, DIM, PANEL, TEXT
-from .waveform import peaks
 from .worker import BLOCKED, BUSY, DONE
 
 AUDIO_TYPES = [("Audio and video", "*.mp3 *.wav *.flac *.m4a *.ogg *.opus *.aac *.wma *.mp4 *.mkv *.webm"),
@@ -151,7 +150,7 @@ class App:
                 "<Escape>": lambda: player.do("clear_loop"), "<Key-l>": player.toggle_loop,
                 "<Control-s>": player.save}
         for i in range(len(NAMES)):
-            keys[f"<Key-{i + 1}>"] = lambda i=i: player.toggle_part(i)
+            keys[f"<Key-{i + 1}>"] = lambda i=i: player.toggle_main(i)
         for key, action in keys.items():
             self.root.bind(key, lambda e, action=action: None if isinstance(e.widget, tk.Entry) else action())
         self.root.bind("<Control-f>", lambda e: (self.search.focus_set(), self.search.select_range(0, "end")))
@@ -362,7 +361,7 @@ class App:
     def _load(self, song: library.Song) -> None:
         try:
             stems = library.load_stems(song.key)
-            self.events.put(("opened", (song, stems, [peaks(d) for d in stems.data])))
+            self.events.put(("opened", (song, stems, all_peaks(stems))))
         except Exception as e:
             self.events.put(("not opened", (song, str(e) or type(e).__name__)))
 
@@ -511,7 +510,7 @@ class App:
         self.reload()
         self.start_work()
 
-    def _opened(self, song: library.Song, stems: library.StemSet, values: list) -> None:
+    def _opened(self, song: library.Song, stems: library.StemSet, values: dict) -> None:
         if song.key != self.opening:
             return  # another one was chosen meanwhile
         self.opening, before = None, self.player.key

@@ -8,16 +8,18 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+import numpy as np
+
 from . import audio, library, midi, settings
 from .cli import DEFAULT_OUT
 from .library import StemSet
 from .mixer import PAUSED, PLAYING, RATE, STOPPED, Mixer, mixdown
-from .models import LABELS
-from .models import parts as current_parts
+from .models import LABELS, PIECES, whole
+from .models import stems as current_stems
 from .parts import PartControls
 from .source import safe_filename
 from .theme import ACCENT, BG, BUTTON, COLORS, DIM, EDGE, TEXT, button
-from .waveform import Waveform, clock
+from .waveform import Waveform, clock, peaks
 
 NO_PORT = "Off"
 
@@ -54,22 +56,68 @@ class Output:
 
 def mix_name(audible: dict[str, bool]) -> str:
     """What to add to the title of a saved mix: " (no voice)", " (only drums, bass)", or nothing."""
+    def merged(names):
+        """All the pieces of a part are the part."""
+        for part, pieces in PIECES.items():
+            if set(pieces) <= set(names):
+                names = [part if n == pieces[0] else n for n in names if n not in pieces[1:]]
+        return names
+
     def words(names):
-        names = list(names)
         if "lead" in names and "backing" in names:
             names = ["voice"] + [n for n in names if n not in ("lead", "backing")]
         shown = {"lead": "lead voice", "backing": "backing voices"}
         return ", ".join(shown.get(n, n) for n in names)
 
-    on, off = [n for n, a in audible.items() if a], [n for n, a in audible.items() if not a]
+    on, off = (merged([n for n, a in audible.items() if a == wanted]) for wanted in (True, False))
     if not off:
         return ""
     return f" (only {words(on)})" if len(on) < len(off) else f" (no {words(off)})"
 
 
-def heard(on: list[bool], solo: list[bool]) -> list[bool]:
-    """Which parts sound: the soloed ones if any, else all; never the muted ones."""
-    return [a and (s or not any(solo)) for a, s in zip(on, solo)]
+def controls(stems: tuple[str, ...]) -> list[tuple[str, int | None]]:
+    """What can be switched in a song: each part, followed by its pieces if it has them.
+
+    Pairs: the name, and for a piece the position of its part.
+    """
+    found: list[tuple[str, int | None]] = []
+    for stem in stems:
+        part = whole(stem)
+        if part and (part, None) not in found:
+            found.append((part, None))
+        found.append((stem, found.index((part, None)) if part else None))
+    return found
+
+
+def heard(on: list[bool], solo: list[bool], parts: list[int | None]) -> list[bool]:
+    """Which controls sound: the soloed ones if any, else all; never the muted ones.
+
+    `parts`: for a piece, the position of its part. Muting a part mutes its pieces, soloing it
+    solos them unless some are soloed themselves; a part sounds when one of its pieces does.
+    """
+    def chosen(i):
+        part = parts[i]
+        if part is None or solo[i]:
+            return solo[i]
+        return solo[part] and not any(s for s, p in zip(solo, parts) if p == part)
+
+    result = [on[i] and (parts[i] is None or on[parts[i]]) and (not any(solo) or chosen(i)) for i in range(len(on))]
+    for part in {p for p in parts if p is not None}:
+        result[part] = any(r for r, p in zip(result, parts) if p == part)
+    return result
+
+
+def all_peaks(stems: StemSet) -> dict[str, np.ndarray]:
+    """What the waveform needs of each stem, and of each part that is made of pieces."""
+    found = {n: peaks(d) for n, d in zip(stems.names, stems.data)}
+    for part, pieces in PIECES.items():
+        data = [d for n, d in zip(stems.names, stems.data) if n in pieces]
+        if data:
+            total = data[0].astype(np.int32)
+            for d in data[1:]:
+                total += d
+            found[part] = peaks(total)
+    return found
 
 
 class PlayerView(tk.Frame):
@@ -82,7 +130,11 @@ class PlayerView(tk.Frame):
         self.mixer: Mixer | None = None
         self.output: Output | None = None
         self.saving = False
-        self.names: tuple[str, ...] = ()  # parts of the song that is open
+        self.names: tuple[str, ...] = ()  # what can be switched in the song that is open
+        self.wholes: list[int | None] = []  # for a piece, the position of its part
+        self.rows: list[int] = []  # those that are shown
+        self.opened: set[str] = set()  # parts whose pieces are shown
+        self.peaks: dict[str, np.ndarray] = {}
         self.on, self.solo, self.volume = [], [], []
         self._results: list[tuple[bool, str]] = []  # of saving, from its thread
         self._shown: dict = {}  # last options given to each widget
@@ -137,7 +189,7 @@ class PlayerView(tk.Frame):
         self.wave.grid(row=1, column=1, sticky="nsew", padx=(0, side))
         self.scrollbar.grid(row=2, column=1, sticky="ew", padx=(0, side))
         self.parts: PartControls | None = None
-        self._use_parts(current_parts())
+        self._use_parts(current_stems())
         self.wave.bind("<Configure>", lambda e: self._place_parts())
 
         bar = tk.Frame(self, bg=BG)
@@ -172,21 +224,40 @@ class PlayerView(tk.Frame):
         self.message = tk.Label(foot, bg=BG, fg=TEXT, font=("Segoe UI", 9), anchor="w")
         self.message.pack(side="left", padx=self.px(8))
 
-    def _use_parts(self, names: tuple[str, ...]) -> None:
-        """Show the controls of these parts: songs separated with other models have others."""
-        if names == self.names:
-            return
-        self.names = tuple(names)
-        self.on, self.solo, self.volume = [True] * len(names), [False] * len(names), [1.0] * len(names)
+    def _use_parts(self, stems: tuple[str, ...]) -> None:
+        """Show the controls of these stems: songs separated with other models have others."""
+        names, wholes = zip(*controls(stems))
+        if names != self.names:
+            self.names, self.wholes = names, list(wholes)
+            n = len(names)
+            self.on, self.solo, self.volume = [True] * n, [False] * n, [1.0] * n
+            self._build_rows()
+
+    def _build_rows(self) -> None:
+        rows = self.rows = [i for i, part in enumerate(self.wholes)
+                            if part is None or self.names[part] in self.opened]
+        names = [self.names[i] for i in rows]
         if self.parts:
             self.parts.destroy()
-        self.parts = PartControls(self, self.k, [LABELS[n] for n in names], [COLORS[n] for n in names],
-                                  self.toggle_part, self.toggle_solo, self.set_volume)
+        self.parts = PartControls(
+            self, self.k, [LABELS[n] for n in names], [COLORS[n] for n in names],
+            lambda row: self.toggle_part(rows[row]), lambda row: self.toggle_solo(rows[row]),
+            lambda row, value: self.set_volume(rows[row], value), lambda row: self.toggle_pieces(names[row]),
+            pieces={row for row, i in enumerate(rows) if self.wholes[i] is not None},
+            opened={row: names[row] in self.opened for row, i in enumerate(rows) if i in self.wholes})
         self.parts.grid(row=1, column=0, sticky="ns", padx=(self.px(14), 0))
         self._place_parts()
+        if self.mixer and all(n in self.peaks for n in names):
+            self.wave.set_lanes([self.peaks[n] for n in names], [COLORS[n] for n in names])
 
     def _place_parts(self) -> None:
-        self.parts.place_rows([self.wave.lane(i, len(self.names)) for i in range(len(self.names))])
+        self.parts.place_rows([self.wave.lane(i, len(self.rows)) for i in range(len(self.rows))])
+
+    def toggle_pieces(self, part: str) -> None:
+        """Show or hide the pieces of a part."""
+        self.opened ^= {part}
+        self._build_rows()
+        self._apply_levels()
 
     # --- songs ------------------------------------------------------------
 
@@ -197,13 +268,14 @@ class PlayerView(tk.Frame):
             if self.mixer.state == PLAYING:
                 self.mixer.pause()
 
-    def open(self, key: str, title: str, stems: StemSet, peaks: list) -> None:
+    def open(self, key: str, title: str, stems: StemSet, values: dict[str, np.ndarray]) -> None:
         """Show a song. The previous one must have been left."""
         self.key, self.title, self.stems = key, title, stems
-        self.mixer = Mixer(stems.data, stems.gain)
+        self.mixer, self.peaks = Mixer(stems.data, stems.gain), values
         self._use_parts(stems.names)
         self.name.configure(text=title, fg=TEXT)
-        self.wave.set_tracks(peaks, [COLORS[n] for n in stems.names], self.mixer.length)
+        names = [self.names[i] for i in self.rows]
+        self.wave.set_tracks([values[n] for n in names], [COLORS[n] for n in names], self.mixer.length)
         self._restore(library.load_state(key))
         if self.output:
             self.output.mixer = self.mixer
@@ -217,13 +289,18 @@ class PlayerView(tk.Frame):
         loop = self.mixer.loop
         return {"on": dict(zip(self.names, self.on)), "solo": dict(zip(self.names, self.solo)),
                 "volume": dict(zip(self.names, self.volume)), "loop": list(loop) if loop else None,
-                "loop_on": self.mixer.loop_on, "position": self.mixer.position}
+                "loop_on": self.mixer.loop_on, "position": self.mixer.position, "opened": sorted(self.opened)}
 
     def _restore(self, state: dict) -> None:
         def part(kind, name, default):
             values = state.get(kind)
             return values.get(name, default) if isinstance(values, dict) else default
 
+        opened = state.get("opened")
+        opened = set(opened) & set(PIECES) if isinstance(opened, list) else set()
+        if opened != self.opened:
+            self.opened = opened
+            self._build_rows()
         self.on = [bool(part("on", n, True)) for n in self.names]
         self.solo = [bool(part("solo", n, False)) for n in self.names]
         self.volume = [min(max(float(part("volume", n, 1.0)), 0.0), 1.0) for n in self.names]
@@ -250,10 +327,15 @@ class PlayerView(tk.Frame):
         if self.mixer:
             self.mixer.enable_loop(not self.mixer.loop_on)
 
+    def toggle_main(self, n: int) -> None:
+        """The n-th part, not counting the pieces: for the keyboard."""
+        main = [i for i, part in enumerate(self.wholes) if part is None]
+        if n < len(main):  # the keys are there for all the parts that can exist
+            self.toggle_part(main[n])
+
     def toggle_part(self, i: int) -> None:
-        if i < len(self.on):  # the keys are there for all the parts that can exist
-            self.on[i] = not self.on[i]
-            self._apply_levels()
+        self.on[i] = not self.on[i]
+        self._apply_levels()
 
     def toggle_solo(self, i: int) -> None:
         self.solo[i] = not self.solo[i]
@@ -264,18 +346,25 @@ class PlayerView(tk.Frame):
         self._apply_levels()
 
     def audible(self) -> list[bool]:
-        return heard(self.on, self.solo)
+        return heard(self.on, self.solo, self.wholes)
 
-    def levels(self) -> list[float]:
-        # Squared: the slider follows how loud it sounds rather than the amplitude.
-        return [v ** 2 if a else 0.0 for v, a in zip(self.volume, self.audible())]
+    def levels(self) -> dict[str, float]:
+        """Of each stem of the song."""
+        found = {}
+        for i, (name, part, sounds) in enumerate(zip(self.names, self.wholes, self.audible())):
+            if i not in self.wholes:
+                volume = self.volume[i] * (1.0 if part is None else self.volume[part])
+                # Squared: the slider follows how loud it sounds rather than the amplitude.
+                found[name] = volume ** 2 if sounds else 0.0
+        return found
 
     def _apply_levels(self) -> None:
         audible = self.audible()
-        for i, level in enumerate(self.levels()):
-            self.do("set_level", i, level)
-            self.parts.show(i, audible[i], not self.on[i], self.solo[i], self.volume[i])
-        self.wave.set_audible(audible)
+        for n, level in enumerate(self.levels().values()):
+            self.do("set_level", n, level)
+        for row, i in enumerate(self.rows):
+            self.parts.show(row, audible[i], not self.on[i], self.solo[i], self.volume[i])
+        self.wave.set_audible([audible[i] for i in self.rows])
 
     # --- saving -----------------------------------------------------------
 
@@ -284,10 +373,10 @@ class PlayerView(tk.Frame):
         if not self.mixer or self.saving:
             return
         levels = self.levels()
-        if not any(levels):
+        if not any(levels.values()):
             self.say("Every part is off: there is nothing to save.")
             return
-        name = safe_filename(self.title, 110) + mix_name(dict(zip(self.names, (bool(v) for v in levels))))
+        name = safe_filename(self.title, 110) + mix_name({n: bool(v) for n, v in levels.items()})
         start = Path(settings.load().get("save_dir") or DEFAULT_OUT)
         start.mkdir(parents=True, exist_ok=True)
         path = filedialog.asksaveasfilename(
@@ -295,7 +384,7 @@ class PlayerView(tk.Frame):
             filetypes=[("MP3", "*.mp3"), ("FLAC", "*.flac"), ("WAV", "*.wav")])
         if path:
             settings.save(save_dir=str(Path(path).parent))
-            self.save_to(Path(path), levels)
+            self.save_to(Path(path), list(levels.values()))
 
     def save_to(self, path: Path, levels: list[float]) -> None:
         self.saving = True

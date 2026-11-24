@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 
 from . import audio, library
-from .models import NAMES, current
+from .models import PIECES, STEMS, current
 from .source import SourceBlocked, SourceError, Status, read_playlist
 
 DONE, BLOCKED, BUSY = 0, 2, 3  # exit codes
@@ -48,7 +48,12 @@ def split(mix: np.ndarray, engine, workdir: Path, status: Status) -> dict[str, n
     lead = stems(voice, models.lead, ["lead"], "Separating the voices")["lead"]
     wind = stems(rest, models.wind, ["wind"], "Separating the wind instruments")["wind"]
     found |= {"lead": lead, "backing": voice - lead, "wind": wind, "other": rest - wind}
-    return {name: found[name] for name in NAMES if name in found}
+    if models.drums and "drums" in found:
+        rest = found.pop("drums")
+        *pieces, last = PIECES["drums"]
+        got = stems(rest, models.drums, pieces, "Separating the drums")
+        found |= got | {last: rest - sum(got.values())}
+    return {name: found[name] for name in STEMS if name in found}
 
 
 def prepare(song: library.Song, engine, workdir: Path, status: Status) -> None:

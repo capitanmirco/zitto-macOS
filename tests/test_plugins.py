@@ -83,13 +83,15 @@ def test_a_ready_song_stays_when_its_plugin_is_gone(monkeypatch, links):
 
 @pytest.mark.parametrize("chosen", [models.DEFAULT, models.STATED])
 def test_the_models_say_their_terms(chosen):
-    for model in (*chosen.main, chosen.lead, chosen.wind):
+    for model in filter(None, (*chosen.main, chosen.lead, chosen.wind, chosen.drums)):
         assert model.terms and model.page.startswith("https://")
 
 
 def test_the_default_models_find_every_part():
     assert models.current() is models.DEFAULT and models.parts() == models.NAMES
     assert targets.available() == targets.TARGETS
+    assert models.stems() == ("lead", "backing", "kick", "snare", "toms", "cymbals", "bass", "guitar", "piano",
+                              "wind", "other")
 
 
 def test_models_with_stated_terms_can_be_asked_for(monkeypatch):
@@ -102,7 +104,7 @@ def test_models_with_stated_terms_can_be_asked_for(monkeypatch):
 
 def test_only_the_parts_the_models_can_find_are_offered(monkeypatch):
     monkeypatch.setenv("ZITTO_MODELS", "stated")
-    assert models.parts() == ("lead", "backing", "drums", "bass", "wind", "other")
+    assert models.parts() == models.stems() == ("lead", "backing", "drums", "bass", "wind", "other")
     assert [t.key for t in targets.available()] == ["voice", "lead-voice", "drums", "bass", "wind", "other"]
     with pytest.raises(targets.UnknownTarget, match="Choose from: voice"):
         targets.resolve(["piano"])
