@@ -6,6 +6,8 @@ NVIDIA GPU when there is one. *Zitto* is Italian for "hush".
 
 ![The window: songs on the left, the parts of the open one on the right](docs/images/player.png)
 
+On a Mac there is a native app: see [macos/README.md](macos/README.md).
+
 Use it with recordings that you made, or that you have the right to use in this way. What you
 do with the result is your responsibility: see [Terms](#terms).
 
