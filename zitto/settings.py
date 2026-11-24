@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-PATH = Path(__file__).resolve().parent.parent / "settings.json"
+PATH = Path(os.environ.get("ZITTO_SETTINGS") or Path(__file__).resolve().parent.parent / "settings.json")
 
 
 def read(path: Path) -> dict:

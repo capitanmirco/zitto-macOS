@@ -2,6 +2,8 @@
 
     python -m zitto.worker WORKDIR      prepare every waiting song, then end
     python -m zitto.worker --add LINK   put a playlist in the list
+    python -m zitto.worker --info       what the plugins and the models offer (for the macOS app)
+    python -m zitto.worker --link LINK  what a link is, for the macOS app, which cannot run plugins
 
 Prints one JSON object per line. Being a process of its own, it can be stopped at any time,
 the window never loads torch, and the GPU memory is free again when it ends.
@@ -10,7 +12,6 @@ the window never loads torch, and the GPU memory is free again when it ends.
 from __future__ import annotations
 
 import json
-import msvcrt
 import sys
 import tempfile
 from pathlib import Path
@@ -19,7 +20,8 @@ import numpy as np
 
 from . import audio, library
 from .models import PIECES, STEMS, current
-from .source import SourceBlocked, SourceError, Status, read_playlist
+from .models import stems as current_stems
+from .source import SourceBlocked, SourceError, Status, link_source, read_playlist
 
 DONE, BLOCKED, BUSY = 0, 2, 3  # exit codes
 WORKING_PEAK = 0.5  # see remover.py
@@ -109,7 +111,7 @@ def _lock():
     file = open(library.ROOT / "worker.lock", "a+b")
     try:
         file.seek(0)
-        msvcrt.locking(file.fileno(), msvcrt.LK_NBLCK, 1)
+        _hold(file)
     except OSError:
         file.close()
         return None
@@ -117,6 +119,18 @@ def _lock():
         file.write(b"Held by the process that is preparing the songs.")
         file.flush()
     return file
+
+
+def _hold(file) -> None:
+    """Lock a file without waiting; OSError when another process holds it."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        msvcrt.locking(file.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
 def add(link: str) -> int:
@@ -130,10 +144,38 @@ def add(link: str) -> int:
         return 1
 
 
+def info() -> int:
+    """What the window needs to know of the plugins and the models, as one event."""
+    from . import plugins
+
+    links = plugins.links()
+    emit("info", links=[s.label for s in links], problems=list(plugins.problems), stems=list(current_stems()))
+    return DONE
+
+
+def inspect(link: str) -> int:
+    """What a link is: the window of the macOS app cannot run the plugins itself."""
+    link = link.strip()
+    opener = link_source(link)
+    if opener is None:
+        emit("error", text="This is a link, and only files can be opened.")
+        return 1
+    try:
+        emit("link", kind=opener.kind(link), key=library.key_for(link), clean=library.clean(link))
+        return DONE
+    except Exception as e:
+        emit("error", text=str(e) or type(e).__name__)
+        return 1
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     if sys.argv[1] == "--add":
         return add(sys.argv[2])
+    if sys.argv[1] == "--info":
+        return info()
+    if sys.argv[1] == "--link":
+        return inspect(sys.argv[2])
     return work(Path(sys.argv[1]))
 
 

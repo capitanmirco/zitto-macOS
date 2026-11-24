@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -11,7 +12,7 @@ import numpy as np
 from .audio import RATE, read_wav, write_wav
 from .models import Model
 
-MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+MODELS_DIR = Path(os.environ.get("ZITTO_MODELS_DIR") or Path(__file__).resolve().parent.parent / "models")
 OPEN_UNMIX_TARGETS = ("vocals", "drums", "bass", "other")
 PIECE, FADE = 60 * RATE, 2 * RATE
 
@@ -78,6 +79,8 @@ class Engine:
             self._loaded.pop((model, workdir), None)
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        elif _has_mps(torch):
+            torch.mps.empty_cache()
 
     def stems(self, audio: np.ndarray, model: Model, parts: list[str], workdir: Path) -> dict[str, np.ndarray]:
         """Separate `audio` and return the parts wanted, at the same scale as the input."""
@@ -114,7 +117,7 @@ class Engine:
     def _open_unmix(self, audio: np.ndarray, model: Model, parts: list[str], workdir: Path) -> dict[str, np.ndarray]:
         import torch
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "mps" if _has_mps(torch) else "cpu"
         network = self._loaded.get((model, workdir))
         if network is None:
             try:
@@ -136,6 +139,12 @@ class Engine:
             return np.stack([_fit(one.T, len(piece)) for one in found])
 
         return dict(zip(parts, in_pieces(audio, process, len(parts))))
+
+
+def _has_mps(torch) -> bool:
+    """The GPU of a Mac."""
+    backend = getattr(torch.backends, "mps", None)
+    return bool(backend and backend.is_available())
 
 
 def in_pieces(audio: np.ndarray, process: Callable[[np.ndarray], np.ndarray], n: int,
