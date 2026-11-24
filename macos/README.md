@@ -38,6 +38,7 @@ As on Windows (see the [README](../README.md)), with the keys of a Mac:
 | mute a part | its number on the keyboard, or click its name; M and S beside it |
 | save what you hear | ⌘S |
 | search | ⌘F; Enter opens the first song found, Esc shows everything again |
+| show or hide the songs of a playlist | click its name |
 | zoom, move | wheel or two fingers up and down, pinch; two fingers sideways or Shift+wheel |
 
 MIDI: on a Mac several programs can use the same device at the same time.
@@ -80,4 +81,12 @@ ZittoCore follows the Python modules closely (`mixer.py` → `Mixer.swift`, `lib
 
     cd macos && swift build && swift test
 
-Or open `macos/Package.swift` in Xcode.
+Or open `macos/Package.swift` in Xcode. The tests of the Python worker run on a Mac too:
+
+    python3 -m pip install numpy soundfile tinytag pytest
+    python3 -m pytest
+
+The tests of the Tk window are skipped there: that window is the one of Windows.
+
+The icon is `Resources/AppIcon.png`, drawn by `scripts/make_icon.py`; `build-app.sh` turns it
+into the icon of the app.

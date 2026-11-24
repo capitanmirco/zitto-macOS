@@ -1,3 +1,4 @@
+import sys
 import tkinter as tk
 from urllib.parse import parse_qs, urlsplit
 
@@ -66,7 +67,12 @@ class SilentOutput:
 
 @pytest.fixture
 def window(monkeypatch):
-    """Starts the window on the library as it is at that moment."""
+    """Starts the window on the library as it is at that moment.
+
+    It is the window of Windows: on a Mac the window is the app in macos/, tested there.
+    """
+    if sys.platform != "win32":
+        pytest.skip("the Tk window is the one of Windows")
     monkeypatch.setattr(player, "Output", SilentOutput)
     monkeypatch.setattr(player.midi, "MidiInput", lambda f: (_ for _ in ()).throw(OSError("none here")))
     started = []

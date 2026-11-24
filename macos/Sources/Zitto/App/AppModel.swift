@@ -20,6 +20,7 @@ struct SongGroup: Identifiable, Equatable {
     let title: String
     let count: String
     let rows: [SongRow]
+    let open: Bool  // its songs are shown
     var isPlaylist: Bool { id != AppModel.singles }
 }
 
@@ -55,7 +56,8 @@ final class AppModel: ObservableObject {
     private var openWhenReady: String?
     private var songs: [String: Song] = [:]  // what is in the library, kept in memory
     private var lists: [SavedPlaylist] = []
-    private var keys: [String: String] = [:]  // row -> song
+    private var keys: [String: String] = [:]  // row -> song, of the rows that are shown
+    private var closed: Set<String> = []  // groups whose songs are hidden
     private var searchLater: DispatchWorkItem?
     private var timer: Timer?
     private var keyMonitor: Any?
@@ -64,6 +66,7 @@ final class AppModel: ObservableObject {
         library = Library(root: Paths.library)
         library.credits = AudioFiles.credits
         settings = SettingsFile(url: Paths.settings)
+        closed = Set(settings.load()["closed_lists"] as? [String] ?? [])
         player = PlayerModel(library: library, settings: settings)
         work = Work { [weak self] run, event in self?.workEvent(run, event) }
         reload()
@@ -112,13 +115,16 @@ final class AppModel: ObservableObject {
             if found.isEmpty {
                 continue
             }
+            let open = !words.isEmpty || !closed.contains(id)  // a search shows what it finds
             let rows = found.map { key -> SongRow in
                 let song = songs[key]!
                 let (state, look) = self.look(song)
-                keys["\(id)/\(key)"] = key
+                if open {
+                    keys["\(id)/\(key)"] = key
+                }
                 return SongRow(id: "\(id)/\(key)", key: key, title: song.title, state: state, look: look)
             }
-            made.append(SongGroup(id: id, title: title, count: count(found), rows: rows))
+            made.append(SongGroup(id: id, title: title, count: count(found), rows: rows, open: open))
         }
         if made != groups {
             groups = made
@@ -169,6 +175,17 @@ final class AppModel: ObservableObject {
         showStatus()
     }
 
+    /// Show or hide the songs of a playlist. It stays as it is left, also at the next start.
+    func toggleGroup(_ id: String) {
+        if closed.contains(id) {
+            closed.remove(id)
+        } else {
+            closed.insert(id)
+        }
+        settings.save(["closed_lists": closed.sorted()])
+        sync()
+    }
+
     // MARK: search
 
     /// When the typing pauses, so that it never waits for the list.
@@ -192,7 +209,7 @@ final class AppModel: ObservableObject {
     /// Enter in the search: the first song found.
     func openFirst() {
         searchNow()
-        if let first = groups.first?.rows.first {
+        if let first = groups.first(where: \.open)?.rows.first {
             open(first.key)
         }
     }
@@ -202,7 +219,8 @@ final class AppModel: ObservableObject {
     /// Songs selected.
     var selected: [String] {
         var seen = Set<String>()
-        return groups.flatMap(\.rows).filter { selection.contains($0.id) }.map(\.key).filter { seen.insert($0).inserted }
+        return groups.filter(\.open).flatMap(\.rows).filter { selection.contains($0.id) }.map(\.key)
+            .filter { seen.insert($0).inserted }
     }
 
     func song(_ key: String) -> Song? {

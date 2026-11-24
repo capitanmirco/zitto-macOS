@@ -7,49 +7,51 @@ second. Copying pixels takes well under a millisecond.
 from __future__ import annotations
 
 import ctypes
+import sys
 from ctypes import wintypes
 
 import numpy as np
 
-_user, _gdi = ctypes.windll.user32, ctypes.windll.gdi32
-_SRCCOPY = 0x00CC0020
+# Only on Windows: elsewhere the module can be imported, for what it shares, but not used.
+WINDOWS = sys.platform == "win32"
+if WINDOWS:
+    _user, _gdi = ctypes.windll.user32, ctypes.windll.gdi32
+    _SRCCOPY = 0x00CC0020
 
+    class _Header(ctypes.Structure):
+        _fields_ = [("size", wintypes.DWORD), ("width", wintypes.LONG), ("height", wintypes.LONG),
+                    ("planes", wintypes.WORD), ("bits", wintypes.WORD), ("compression", wintypes.DWORD),
+                    ("image_size", wintypes.DWORD), ("x_ppm", wintypes.LONG), ("y_ppm", wintypes.LONG),
+                    ("used", wintypes.DWORD), ("important", wintypes.DWORD)]
 
-class _Header(ctypes.Structure):
-    _fields_ = [("size", wintypes.DWORD), ("width", wintypes.LONG), ("height", wintypes.LONG),
-                ("planes", wintypes.WORD), ("bits", wintypes.WORD), ("compression", wintypes.DWORD),
-                ("image_size", wintypes.DWORD), ("x_ppm", wintypes.LONG), ("y_ppm", wintypes.LONG),
-                ("used", wintypes.DWORD), ("important", wintypes.DWORD)]
+    def _declare(function, result, *arguments):
+        function.restype, function.argtypes = result, arguments
+        return function
 
+    _GetDC = _declare(_user.GetDC, wintypes.HDC, wintypes.HWND)
+    _ReleaseDC = _declare(_user.ReleaseDC, ctypes.c_int, wintypes.HWND, wintypes.HDC)
+    _FillRect = _declare(_user.FillRect, ctypes.c_int, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH)
+    _CreateCompatibleDC = _declare(_gdi.CreateCompatibleDC, wintypes.HDC, wintypes.HDC)
+    _DeleteDC = _declare(_gdi.DeleteDC, wintypes.BOOL, wintypes.HDC)
+    _CreateDIBSection = _declare(_gdi.CreateDIBSection, wintypes.HBITMAP, wintypes.HDC, ctypes.POINTER(_Header),
+                                 wintypes.UINT, ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD)
+    _SelectObject = _declare(_gdi.SelectObject, wintypes.HGDIOBJ, wintypes.HDC, wintypes.HGDIOBJ)
+    _DeleteObject = _declare(_gdi.DeleteObject, wintypes.BOOL, wintypes.HGDIOBJ)
+    _CreateSolidBrush = _declare(_gdi.CreateSolidBrush, wintypes.HBRUSH, wintypes.COLORREF)
+    _BitBlt = _declare(_gdi.BitBlt, wintypes.BOOL, wintypes.HDC, *[ctypes.c_int] * 4, wintypes.HDC,
+                       *[ctypes.c_int] * 2, wintypes.DWORD)
+    _GdiFlush = _declare(_gdi.GdiFlush, wintypes.BOOL)
 
-def _declare(function, result, *arguments):
-    function.restype, function.argtypes = result, arguments
-    return function
-
-
-_GetDC = _declare(_user.GetDC, wintypes.HDC, wintypes.HWND)
-_ReleaseDC = _declare(_user.ReleaseDC, ctypes.c_int, wintypes.HWND, wintypes.HDC)
-_FillRect = _declare(_user.FillRect, ctypes.c_int, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH)
-_CreateCompatibleDC = _declare(_gdi.CreateCompatibleDC, wintypes.HDC, wintypes.HDC)
-_DeleteDC = _declare(_gdi.DeleteDC, wintypes.BOOL, wintypes.HDC)
-_CreateDIBSection = _declare(_gdi.CreateDIBSection, wintypes.HBITMAP, wintypes.HDC, ctypes.POINTER(_Header),
-                             wintypes.UINT, ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD)
-_SelectObject = _declare(_gdi.SelectObject, wintypes.HGDIOBJ, wintypes.HDC, wintypes.HGDIOBJ)
-_DeleteObject = _declare(_gdi.DeleteObject, wintypes.BOOL, wintypes.HGDIOBJ)
-_CreateSolidBrush = _declare(_gdi.CreateSolidBrush, wintypes.HBRUSH, wintypes.COLORREF)
-_BitBlt = _declare(_gdi.BitBlt, wintypes.BOOL, wintypes.HDC, *[ctypes.c_int] * 4, wintypes.HDC,
-                   *[ctypes.c_int] * 2, wintypes.DWORD)
-_GdiFlush = _declare(_gdi.GdiFlush, wintypes.BOOL)
-
-
-_GetClassLong = _declare(_user.GetClassLongPtrW, ctypes.c_size_t, wintypes.HWND, ctypes.c_int)
-_SetClassLong = _declare(_user.SetClassLongPtrW, ctypes.c_size_t, wintypes.HWND, ctypes.c_int, ctypes.c_size_t)
-_GCL_STYLE, _REDRAW_ON_RESIZE = -26, 0x0003
+    _GetClassLong = _declare(_user.GetClassLongPtrW, ctypes.c_size_t, wintypes.HWND, ctypes.c_int)
+    _SetClassLong = _declare(_user.SetClassLongPtrW, ctypes.c_size_t, wintypes.HWND, ctypes.c_int, ctypes.c_size_t)
+    _GCL_STYLE, _REDRAW_ON_RESIZE = -26, 0x0003
 
 
 def keep_content_on_resize(*windows: int) -> None:
     """Stop Windows from repainting whole windows at each change of size, for the window classes
     of these handles. Tk draws again what needs it by itself: without this it happens twice."""
+    if not WINDOWS:
+        return
     for window in windows:
         _SetClassLong(window, _GCL_STYLE, _GetClassLong(window, _GCL_STYLE) & ~_REDRAW_ON_RESIZE)
 
@@ -62,6 +64,8 @@ def rgb(color: str) -> int:
 class Surface:
     def __init__(self, window: int):
         """`window`: the handle of the window to draw on."""
+        if not WINDOWS:
+            raise OSError("This window draws through Windows. On a Mac, use the app in macos/.")
         self._window = window
         self._dc = _CreateCompatibleDC(None)
         self._bitmap = self._previous = None
