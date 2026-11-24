@@ -56,7 +56,7 @@ struct LibraryView: View {
         List(selection: $model.selection) {
             ForEach(model.groups) { group in
                 Section {
-                    ForEach(group.rows) { row in
+                    ForEach(group.open ? group.rows : []) { row in
                         HStack {
                             Text(row.title).lineLimit(1).truncationMode(.tail)
                             Spacer(minLength: 6)
@@ -66,11 +66,18 @@ struct LibraryView: View {
                         .tag(row.id)
                     }
                 } header: {
-                    HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: group.open ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.zDim)
+                            .frame(width: 10)
                         Text(group.title).font(.system(size: 12, weight: .semibold)).foregroundColor(.zText)
                         Spacer()
                         Text(group.count).font(.system(size: 11)).foregroundColor(.zDim)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.toggleGroup(group.id) }
+                    .help(group.open ? "Click to hide its songs" : "Click to show its songs")
                     .contextMenu {
                         Button(group.isPlaylist ? "Delete the playlist..." : "Delete all these songs...") {
                             model.deleteSelected(playlist: group.id)

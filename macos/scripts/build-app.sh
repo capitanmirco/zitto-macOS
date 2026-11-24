@@ -21,6 +21,14 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary" "$app/Contents/MacOS/Zitto"
 sed "s/__VERSION__/$version/g" Resources/Info.plist > "$app/Contents/Info.plist"
 cp ../LICENSE.md ../NOTICE.md "$app/Contents/Resources/"
+# The icon, from Resources/AppIcon.png (drawn by scripts/make_icon.py).
+icons=build/AppIcon.iconset
+rm -rf "$icons" && mkdir -p "$icons"
+for size in 16 32 128 256 512; do
+    sips -z $size $size Resources/AppIcon.png --out "$icons/icon_${size}x${size}.png" >/dev/null
+    sips -z $((size * 2)) $((size * 2)) Resources/AppIcon.png --out "$icons/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$icons" -o "$app/Contents/Resources/AppIcon.icns"
 # Signed for this Mac only. To give it to others: a Developer ID and notarization.
 codesign --force --sign - "$app"
 echo "Ready: macos/$app"
