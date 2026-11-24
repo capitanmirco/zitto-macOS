@@ -12,6 +12,7 @@ jobs:
     runs-on: macos-15
     defaults:
       run:
+        shell: bash -eo pipefail {0}
         working-directory: macos
     steps:
       - uses: actions/checkout@v4

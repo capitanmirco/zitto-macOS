@@ -6,19 +6,19 @@ import os
 /// A lock short enough for the audio thread.
 public final class FastLock {
     #if canImport(os)
-    private let lock: UnsafeMutablePointer<os_unfair_lock>
+    private let unfair: UnsafeMutablePointer<os_unfair_lock>
 
     public init() {
-        lock = .allocate(capacity: 1)
-        lock.initialize(to: os_unfair_lock())
+        unfair = .allocate(capacity: 1)
+        unfair.initialize(to: os_unfair_lock())
     }
 
     deinit {
-        lock.deallocate()
+        unfair.deallocate()
     }
 
-    @inline(__always) public func lock() { os_unfair_lock_lock(lock) }
-    @inline(__always) public func unlock() { os_unfair_lock_unlock(lock) }
+    @inline(__always) public func lock() { os_unfair_lock_lock(unfair) }
+    @inline(__always) public func unlock() { os_unfair_lock_unlock(unfair) }
     #else
     private let mutex = NSLock()
 
