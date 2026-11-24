@@ -344,6 +344,27 @@ def test_add_command_reports_what_it_did(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out) == {"event": "error", "text": "The playlist does not exist"}
 
 
+def test_info_command_tells_the_macos_app_what_is_there(capsys):
+    assert worker.info() == worker.DONE
+    told = json.loads(capsys.readouterr().out)
+    assert told["event"] == "info" and told["links"] == ["a link to songs.example"]
+    assert told["stems"] == list(models.stems()) and told["problems"] == []
+
+
+@pytest.mark.parametrize("link, kind", [(LINK, source.SONG), (LIST, source.LIST),
+                                        ("https://songs.example/alpha?list=one", source.SONG_IN_LIST)])
+def test_link_command_reads_a_link_for_the_macos_app(capsys, link, kind):
+    assert worker.inspect(f"  {link} ") == worker.DONE
+    told = json.loads(capsys.readouterr().out)
+    assert told["event"] == "link" and told["kind"] == kind
+    assert told["key"] == library.key_for(link) and told["clean"] == library.clean(link)
+
+
+def test_link_command_refuses_what_no_plugin_opens(capsys):
+    assert worker.inspect("https://elsewhere.example/a") == 1
+    assert json.loads(capsys.readouterr().out)["event"] == "error"
+
+
 # --- settings ------------------------------------------------------------------------
 
 def test_settings(tmp_path):
